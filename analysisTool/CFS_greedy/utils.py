@@ -60,6 +60,7 @@ class Entropy:
             self.cache[sx_id] = np.sum(
                 (-1) * normalized_cardinality * np.log2(normalized_cardinality)
             )
+
         return self.cache[sx_id]
 
     def entropy_d_tuple(self, sx):
@@ -76,22 +77,21 @@ class Entropy:
         return self.entropy_d_tuple(to_numba_list(zip(f1, f2)))
 
 
-@njit(parallel=False)
-def su_calculation(f1: np.array, f2: np.array, variables: Tuple[str, str], entropy_estimator) -> float:
-    """
-    Compute the symmetrical uncertainty, where su(f1,f2) = 2*IG(f1,f2)/(H(f1)+H(f2))
-    """
-    entropy_instance = Entropy()
-    f1_id, f2_id = variables
-    entropy_f1 = entropy_instance.entropy_d(f1, f1_id)
+    def su_calculation(self, f1: np.array, f2: np.array, variables: Tuple[str, str]) -> float:
+        """
+        Compute the symmetrical uncertainty, where su(f1,f2) = 2*IG(f1,f2)/(H(f1)+H(f2))
+        """
+        #entropy_instance = Entropy()
+        f1_id, f2_id = variables
+        entropy_f1 = self.entropy_d(f1, f1_id)
 
-    entropy_f2 = entropy_instance.entropy_d(f2, f2_id)
+        entropy_f2 = self.entropy_d(f2, f2_id)
 
-    entropy_f1f2 = entropy_instance.joint_entropy(f1, f2)
+        entropy_f1f2 = self.joint_entropy(f1, f2)
 
-    # Compute the mutual information, where ig(f1,f2) = H(f1) + H(f2) - H(f1;f2)
-    mutual_information = entropy_f1 + entropy_f2 - entropy_f1f2
+        # Compute the mutual information, where ig(f1,f2) = H(f1) + H(f2) - H(f1;f2)
+        mutual_information = entropy_f1 + entropy_f2 - entropy_f1f2
 
-    su = 2.0 * mutual_information / (entropy_f1 + entropy_f2)
+        su = 2.0 * mutual_information / (entropy_f1 + entropy_f2)
 
-    return su
+        return su

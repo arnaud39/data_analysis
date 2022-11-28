@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 
-from analysisTool import cfs, su_calculation
+from analysisTool import cfs
 from typing import List, Tuple
 
 
@@ -80,9 +80,9 @@ def pipeline():
     et = time.time()
     print(f"cfs: {et - st} seconds")
     
-    features = [x_cols[k] for k in features_array]
+    #features = [x_cols[k] for k in features_array]
 
-    print(features)
+    #print(features)
     print(merits_array)
 
 

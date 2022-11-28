@@ -1,7 +1,7 @@
 from typing import List
 from tqdm import tqdm
 from multiprocessing import Process, Queue, Pool
-from .utils import su_calculation, Entropy
+from .utils import Entropy
 from numba import njit, prange
 
 import numba
@@ -11,13 +11,12 @@ import pandas as pd
 signature = (numba.typeof((np.array([np.int64(1)]), np.array([0.1, 0.1]))))(
     numba.types.Array(dtype=numba.types.uint8, ndim=2, layout="C"),
     numba.types.Array(dtype=numba.types.uint8, ndim=2, layout="C"),
-    # numba.types.Array(dtype=numba.types.float32, ndim=1, layout="F"),
+    #numba.types.Array(dtype=numba.types.float32, ndim=1, layout="F"),
     numba.typeof(5),
 )
 
-
-@njit(parallel=True)
-def merit_calculation(X: np.array, y: np.array, entropy_estimator) -> float:
+@njit(parallel=False)
+def merit_calculation(X: np.array, y: np.array) -> float:
     """
     This function calculates the merit of X given class labels y, where
     merits = (k * rcf)/sqrt(k+k*(k-1)*rff)
@@ -29,21 +28,21 @@ def merit_calculation(X: np.array, y: np.array, entropy_estimator) -> float:
     _, n_labels = y.shape
 
     rff, rcf = 0, 0
-    for i in prange(n_features):
+    
+    entropy_ = Entropy()
+    for i in range(n_features):
         f_i = X[:, i]
         # take the average
         for label_index in range(n_labels):
             y_j = y[:, label_index]
-            rcf += su_calculation(
-                f_i, y_j, (f"f_{i}", f"y_{label_index}"), entropy_estimator
-            )
+            rcf += entropy_.su_calculation(f_i, y_j, (f"f_{i}", f"y_{label_index}"))
 
         for j in range(n_features):
             if j > i:
                 f_j = X[:, j]
-                rff += su_calculation(f_i, f_j, (f"f_{i}", f"f_{j}"), entropy_estimator)
-    rff *= 2  # symmetrical uncertainty is symetrical
-    rcf /= n_labels  # average
+                rff += entropy_.su_calculation(f_i, f_j, (f"f_{i}", f"f_{j}"))
+    rff *= 2 #symmetrical uncertainty is symetrical             
+    rcf /= n_labels #average
     merits = rcf / np.sqrt(n_features + rff)
     return merits
 
@@ -77,23 +76,19 @@ def cfs(
     Mark A. Hall "Correlation-based Feature Selection for Machine Learning" 1999.
     """
 
-    X_, y_ = X_.astype(numba.float32), y_.astype(numba.float32)  # .squeeze()
+    X_, y_ = X_.astype(numba.float32), y_.astype(numba.float32)#.squeeze()
     n_samples, n_features = X_.shape
     # index of features
     features = []
     # merit values
     merits = []
     availables_features = list(range(n_features))
-
-    entropy_estimator = Entropy()
-
+    
     while availables_features:
         merit_candidates = []
         for next_ in availables_features:
             features.append(next_)
-            merit_candidates.append(
-                merit_calculation(X_[:, np.array(features)], y_, entropy_estimator)
-            )
+            merit_candidates.append(merit_calculation(X_[:, np.array(features)], y_))
             features.pop()
         next_merit = max(merit_candidates)
         next_feature = availables_features[merit_candidates.index(next_merit)]

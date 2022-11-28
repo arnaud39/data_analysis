@@ -27,7 +27,7 @@ def convert_objects(df: pd.DataFrame) -> Tuple[List[str], np.array]:
     objects_cols = df.select_dtypes(exclude=numerics).columns
     for proc_col in objects_cols:
         bijectiv_hasher = {k: v for v, k in enumerate(df[proc_col].unique())}
-        df[proc_col] = df[proc_col].replace(bijectiv_hasher).astype("int32")
+        df.loc[:,proc_col] = df[proc_col].replace(bijectiv_hasher).astype("int32")
     return list(objects_cols), df[objects_cols].to_numpy()
 
 
@@ -50,7 +50,7 @@ def convert_numbers(df: pd.DataFrame) -> Tuple[List[str], np.array]:
     return list(numeric_cols), np.column_stack(tuple(stack))
 
 
-def pipeline_cfs(df_x: pd.DataFrame, dy_: pd.DataFrame) -> Tuple[List[str], np.array]:
+def pipeline_cfs(df_x: pd.DataFrame, df_y: pd.DataFrame) -> Tuple[List[str], np.array]:
     """Pipeline for the cfs algorithm. 
     Apply preprocessing on the data.
 
@@ -62,9 +62,6 @@ def pipeline_cfs(df_x: pd.DataFrame, dy_: pd.DataFrame) -> Tuple[List[str], np.a
         Tuple[List[str], np.array]:list of selected features
         and array of their scores.
     """
-    df_x = pd.read_csv("df_x.csv", index_col=0)
-    df_y = pd.read_csv("df_y.csv", index_col=0)
-
     # remove nan, that would be used for entropy calculation
     index_drop = df_x.isna().any(axis=1)
     df_x = df_x[~index_drop]

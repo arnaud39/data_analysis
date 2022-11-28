@@ -1,7 +1,7 @@
 from typing import List
 from tqdm import tqdm
 from multiprocessing import Process, Queue, Pool
-from .utils import su_calculation
+from .utils import su_calculation, Entropy
 from numba import njit, prange
 
 import numba
@@ -9,14 +9,15 @@ import numpy as np
 import pandas as pd
 
 signature = (numba.typeof((np.array([np.int64(1)]), np.array([0.1, 0.1]))))(
-    numba.types.Array(dtype=numba.types.float64, ndim=2, layout="C"),
-    numba.types.Array(dtype=numba.types.float64, ndim=1, layout="C"),
+    numba.types.Array(dtype=numba.types.uint8, ndim=2, layout="C"),
+    numba.types.Array(dtype=numba.types.uint8, ndim=2, layout="C"),
+    # numba.types.Array(dtype=numba.types.float32, ndim=1, layout="F"),
     numba.typeof(5),
 )
 
 
 @njit(parallel=True)
-def merit_calculation(X: np.array, y: np.array) -> float:
+def merit_calculation(X: np.array, y: np.array, entropy_estimator) -> float:
     """
     This function calculates the merit of X given class labels y, where
     merits = (k * rcf)/sqrt(k+k*(k-1)*rff)
@@ -25,25 +26,24 @@ def merit_calculation(X: np.array, y: np.array) -> float:
     """
 
     n_samples, n_features = X.shape
-    #_, n_labels = y.shape
+    _, n_labels = y.shape
 
     rff, rcf = 0, 0
     for i in prange(n_features):
         f_i = X[:, i]
-
-        next_rcf = 0
-
         # take the average
-        for label_index in range(1):
-            y_j = y#[:, label_index]
-            next_rcf += su_calculation(f_i, y_j)
-        next_rcf /= 1#n_labels
-        rcf += next_rcf
+        for label_index in range(n_labels):
+            y_j = y[:, label_index]
+            rcf += su_calculation(
+                f_i, y_j, (f"f_{i}", f"y_{label_index}"), entropy_estimator
+            )
 
         for j in range(n_features):
             if j > i:
                 f_j = X[:, j]
-                rff += su_calculation(f_i, f_j)
+                rff += su_calculation(f_i, f_j, (f"f_{i}", f"f_{j}"), entropy_estimator)
+    rff *= 2  # symmetrical uncertainty is symetrical
+    rcf /= n_labels  # average
     merits = rcf / np.sqrt(n_features + rff)
     return merits
 
@@ -53,7 +53,10 @@ def isUpping(A: np.array):
     """
     This function check if the serie is increasing.
     """
-    return all(A[i] <= A[i + 1] for i in range(len(A) - 1))
+    for i in range(len(A) - 1):
+        if A[i] > A[i + 1]:
+            return False
+    return True
 
 
 @njit(signature, parallel=False)
@@ -61,7 +64,7 @@ def cfs(
     X_: np.array,
     y_: np.array,
     min_features: int = 5,
-) -> np.array:
+):
     """
     This function uses a correlation based greedy to evaluate the worth of features.
 
@@ -74,7 +77,7 @@ def cfs(
     Mark A. Hall "Correlation-based Feature Selection for Machine Learning" 1999.
     """
 
-    # X, y = X_.to_numpy(), y_.to_numpy().squeeze()
+    X_, y_ = X_.astype(numba.float32), y_.astype(numba.float32)  # .squeeze()
     n_samples, n_features = X_.shape
     # index of features
     features = []
@@ -82,11 +85,15 @@ def cfs(
     merits = []
     availables_features = list(range(n_features))
 
+    entropy_estimator = Entropy()
+
     while availables_features:
         merit_candidates = []
         for next_ in availables_features:
             features.append(next_)
-            merit_candidates.append(merit_calculation(X_[:, np.array(features)], y_))
+            merit_candidates.append(
+                merit_calculation(X_[:, np.array(features)], y_, entropy_estimator)
+            )
             features.pop()
         next_merit = max(merit_candidates)
         next_feature = availables_features[merit_candidates.index(next_merit)]
@@ -98,8 +105,8 @@ def cfs(
 
         # converge criterion with greedy
         if len(features) >= min_features and not (isUpping(merits[min_features - 1 :])):
-            #best = merits.index(max(merits[min_features:])) + 1
-            #features = features[:best]
+            best = merits.index(max(merits[min_features:])) + 1
+            features = features[:best]
             break
 
     features_array = np.array(features)

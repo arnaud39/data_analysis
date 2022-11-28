@@ -76,8 +76,7 @@ def cfs_opt(X: np.array, y: np.array, min_features):
         merit_candidates = []
         for next_ in availables_features:
             features.append(next_)
-            merit_candidates.append(merit_calculation(X[:, np.array(features)],
-                                                      y))
+            merit_candidates.append(merit_calculation(X[:, np.array(features)], y))
             features.pop()
         next_merit = max(merit_candidates)
         next_feature = availables_features[merit_candidates.index(next_merit)]
@@ -89,7 +88,7 @@ def cfs_opt(X: np.array, y: np.array, min_features):
 
         # converge criterion with greedy
         if (len(features) >= min_features) and not (
-            isUpping(merits[min_features-1:])
+            isUpping(merits[min_features - 1 :])
         ):
             best = merits.index(max(merits[min_features:])) + 1
             features = features[:best]

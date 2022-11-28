@@ -1,9 +1,8 @@
 import pandas as pd
-import time
 import numpy as np
 
 
-from analysisTool import cfs
+from .cfs import cfs
 from typing import List, Tuple
 
 
@@ -51,8 +50,18 @@ def convert_numbers(df: pd.DataFrame) -> Tuple[List[str], np.array]:
     return list(numeric_cols), np.column_stack(tuple(stack))
 
 
-def pipeline():
-    st = time.time()
+def pipeline_cfs(df_x: pd.DataFrame, dy_: pd.DataFrame) -> Tuple[List[str], np.array]:
+    """Pipeline for the cfs algorithm. 
+    Apply preprocessing on the data.
+
+    Args:
+        df_x (pd.DataFrame): Dataframe of features
+        dy_ (pd.DataFrame): Dataframe of labels
+
+    Returns:
+        Tuple[List[str], np.array]:list of selected features
+        and array of their scores.
+    """
     df_x = pd.read_csv("df_x.csv", index_col=0)
     df_y = pd.read_csv("df_y.csv", index_col=0)
 
@@ -66,25 +75,13 @@ def pipeline():
 
     numbers_x, x_numbers = convert_numbers(df_x)
     numbers_y, y_numbers = convert_numbers(df_y)
-    
+
     x_cols = ojects_x + numbers_x
-    
-    
+
     X = np.hstack((x_objects, x_numbers)).astype("uint8")
     y = np.hstack((y_objects, y_numbers)).astype("uint8")
-    et = time.time()
-    print(f"pipeline: {et - st} seconds")
-
-    st = time.time()
     features_array, merits_array = cfs(X, y, len(x_cols))
-    et = time.time()
-    print(f"cfs: {et - st} seconds")
-    
+
     features = [x_cols[k] for k in features_array]
 
-    print(features)
-    print(merits_array)
-
-
-if __name__ == "__main__":
-    pipeline()
+    return features, merits_array

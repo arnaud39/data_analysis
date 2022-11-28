@@ -15,8 +15,8 @@ signature = (numba.typeof((np.array([np.int64(1)]), np.array([0.1, 0.1]))))(
     numba.typeof(5),
 )
 
-@njit(parallel=False)
-def merit_calculation(X: np.array, y: np.array) -> float:
+@njit(parallel=True)
+def merit_calculation(X: np.array, y: np.array, features: np.array, entropy_) -> float:
     """
     This function calculates the merit of X given class labels y, where
     merits = (k * rcf)/sqrt(k+k*(k-1)*rff)
@@ -29,18 +29,17 @@ def merit_calculation(X: np.array, y: np.array) -> float:
 
     rff, rcf = 0, 0
     
-    entropy_ = Entropy()
-    for i in range(n_features):
+    for i in prange(n_features):
         f_i = X[:, i]
         # take the average
         for label_index in range(n_labels):
             y_j = y[:, label_index]
-            rcf += entropy_.su_calculation(f_i, y_j, (f"f_{i}", f"y_{label_index}"))
+            rcf += entropy_.su_calculation(f_i, y_j, (f"f_{features[i]}", f"y_{label_index}"))
 
         for j in range(n_features):
             if j > i:
                 f_j = X[:, j]
-                rff += entropy_.su_calculation(f_i, f_j, (f"f_{i}", f"f_{j}"))
+                rff += entropy_.su_calculation(f_i, f_j, (f"f_{features[i]}", f"f_{features[j]}"))
     rff *= 2 #symmetrical uncertainty is symetrical             
     rcf /= n_labels #average
     merits = rcf / np.sqrt(n_features + rff)
@@ -84,11 +83,13 @@ def cfs(
     merits = []
     availables_features = list(range(n_features))
     
+    entropy_ = Entropy()
+    
     while availables_features:
         merit_candidates = []
         for next_ in availables_features:
             features.append(next_)
-            merit_candidates.append(merit_calculation(X_[:, np.array(features)], y_))
+            merit_candidates.append(merit_calculation(X_[:, np.array(features)], y_, np.array(features), entropy_))
             features.pop()
         next_merit = max(merit_candidates)
         next_feature = availables_features[merit_candidates.index(next_merit)]

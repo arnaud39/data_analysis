@@ -76,13 +76,13 @@ def pipeline():
     print(f"pipeline: {et - st} seconds")
 
     st = time.time()
-    features_array, merits_array = cfs(X, y, 5)
+    features_array, merits_array = cfs(X, y, len(x_cols))
     et = time.time()
     print(f"cfs: {et - st} seconds")
     
-    #features = [x_cols[k] for k in features_array]
+    features = [x_cols[k] for k in features_array]
 
-    #print(features)
+    print(features)
     print(merits_array)
 
 
